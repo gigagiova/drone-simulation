@@ -3,6 +3,7 @@ from panda3d.core import loadPrcFileData, CardMaker, NodePath, TextNode, Texture
 from direct.gui.OnscreenText import OnscreenText
 from drone import Drone
 import random
+import math
 
 
 # Configure the window
@@ -26,14 +27,13 @@ class DroneSimulation(ShowBase):
         self.setup_environment()
         self.setup_scenery()
 
-        # Drone setup, starting at the origin 2m above the ground
-        self.drone = self.render.attachNewNode("drone")
-        Drone().mesh.reparentTo(self.drone)
-        self.drone.setPos(0, 0, 2)
+        # Drone setup
+        self.drone = Drone(self.loader, self.render)
 
         self.setup_cameras()
 
         self.taskMgr.add(self.camera_move_task, "camera_move_task")
+        self.taskMgr.add(self.drone_move_task, "drone_move_task")
 
         self.coords_text = OnscreenText(
             text="Pos: (0, 0, 0)", pos=(-1.7, 0.9), scale=0.05, align=TextNode.ALeft, mayChange=True
@@ -49,6 +49,11 @@ class DroneSimulation(ShowBase):
         self.accept("s-up", self.setKey, ["s", False])
         self.accept("a-up", self.setKey, ["a", False])
         self.accept("d-up", self.setKey, ["d", False])
+
+    def drone_move_task(self, task):
+        """Moves the drone based on its internal logic."""
+        self.drone.update(self.camera, task.dt)
+        return task.cont
 
     def camera_move_task(self, task):
         dt = task.dt
@@ -95,7 +100,7 @@ class DroneSimulation(ShowBase):
         # The skybox ground plane is 400x400 units.
         area_side = 400
         # The desired density of trees is 4 per 100 square meters.
-        density_per_100_sq_m = 4
+        density_per_100_sq_m = 1
 
         # Calculate the total number of trees to place based on the area and density.
         total_area = area_side * area_side
@@ -212,8 +217,8 @@ class DroneSimulation(ShowBase):
         """Sets up the cameras and their display regions."""
         self.camera.reparentTo(self.render)
         # Set initial camera position at 2m height, behind the drone
-        self.camera.setPos(0, 0, 2)
-        self.camera.lookAt(self.drone)
+        self.camera.setPos(-20, -80, 2)
+        self.camera.setHpr(0, 5, 0)
 
 
 app = DroneSimulation()
