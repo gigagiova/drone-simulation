@@ -1,34 +1,48 @@
-from panda3d.core import Vec3
+from panda3d.core import Vec3, CardMaker, TransparencyAttrib
 import random
 
 
 class Drone:
 
     def __init__(self, loader, render):
-        """Creates a drone as a red sphere."""
+        """Creates a drone from an image."""
         # The drone is a NodePath, the top-level object for the drone in the scene.
         self.node = render.attachNewNode("drone")
-        # Load a built-in sphere model from Panda3D's assets.
-        self.mesh = loader.loadModel("misc/sphere")
-        self.mesh.reparentTo(self.node)
 
-        # The user requested a 40cm diameter, which is 0.4 meters.
-        # The default sphere model has a diameter of 2 units (a radius of 1 unit).
-        # To achieve the desired size, we calculate the scale factor:
-        # desired_diameter / default_diameter = 0.4 / 2.0 = 0.2.
-        self.mesh.setScale(0.2)
+        # Load the drone texture.
+        drone_texture = loader.loadTexture("assets/images/drone.png")
 
-        # Set the color of the drone to be solid red.
-        # The color is specified in RGBA format (Red, Green, Blue, Alpha).
-        self.mesh.setColor(1, 0, 0, 1)
+        # Create a card (a flat rectangle) to display the texture.
+        cm = CardMaker("drone-card")
+        # The card is created with a size of 1x1.
+        # We'll set the frame to be centered at (0,0,0)
+        cm.setFrame(-0.5, 0.5, -0.5, 0.5)
+        self.mesh = self.node.attachNewNode(cm.generate())
+
+        # Apply the texture to the card.
+        self.mesh.setTexture(drone_texture)
+
+        # Enable transparency to see through the PNG's alpha channel.
+        self.mesh.setTransparency(TransparencyAttrib.M_alpha)
+
+        # The user requested a 40cm width, which is 0.4 meters.
+        # We need to scale the card to match the aspect ratio of the texture.
+        tex_width = drone_texture.getXSize()
+        tex_height = drone_texture.getYSize()
+        aspect_ratio = tex_height / tex_width
+        drone_height = 0.4 * aspect_ratio
+        self.node.setScale(0.4, 1, drone_height)
+
+        # Make the drone always face the camera.
+        self.node.setBillboardPointEye()
 
         # Set initial position 2m above the ground
         self.node.setPos(random.uniform(-20, 20), random.uniform(50, 80), 10)
 
         # The speed of the drone in meters per second.
-        self.speed = 100000.0
+        self.speed = 50000.0
         # The intensity of the random Brownian motion as a factor of speed.
-        self.brownian_factor = 0.1  # 10% of speed
+        self.brownian_factor = 0.05  # 10% of speed
         # Controls how smoothly the Brownian motion changes direction.
         # A higher value results in slower, smoother, more drifting changes.
         self.brownian_smoothness = 0.5
