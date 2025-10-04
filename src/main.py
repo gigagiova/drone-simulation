@@ -2,11 +2,15 @@ from direct.showbase.ShowBase import ShowBase
 from panda3d.core import loadPrcFileData, CardMaker, NodePath, TextNode, Texture, TextureStage
 from direct.gui.OnscreenText import OnscreenText
 from drone import Drone
+import random
+
 
 # Configure the window
 config = """
 win-size 1280 720
 window-title Drone Simulation
+load-file-type p3assimp
+model-cache-dir
 """
 loadPrcFileData("", config)
 
@@ -20,6 +24,7 @@ class DroneSimulation(ShowBase):
 
         # Setup the scene
         self.setup_environment()
+        self.setup_scenery()
 
         # Drone setup, starting at the origin 2m above the ground
         self.drone = self.render.attachNewNode("drone")
@@ -48,7 +53,7 @@ class DroneSimulation(ShowBase):
     def camera_move_task(self, task):
         dt = task.dt
         speed = 20000
-        rot_speed = 10000
+        rot_speed = 100000
 
         # Get the forward vector of the camera in world space.
         forward_vec = self.camera.getQuat(self.render).getForward()
@@ -79,6 +84,59 @@ class DroneSimulation(ShowBase):
     def setKey(self, key, value):
         self.keyMap[key] = value
 
+    def setup_scenery(self):
+        """
+        Populates the world with trees.
+
+        This method instances a tree model at random locations on the ground plane,
+        respecting a given density.
+        """
+        # Define the area for placing trees, matching the ground plane size of the skybox.
+        # The skybox ground plane is 400x400 units.
+        area_side = 400
+        # The desired density of trees is 4 per 100 square meters.
+        density_per_100_sq_m = 4
+
+        # Calculate the total number of trees to place based on the area and density.
+        total_area = area_side * area_side
+        num_trees = int((total_area / 100) * density_per_100_sq_m)
+
+        # Load the tree model from the assets folder.
+        tree_model = self.loader.loadModel("../assets/models/Tree.obj")
+        tree_model.setTransparency(True)
+
+        # Get the dimensions of the model to calculate the correct scale.
+        min_bounds, max_bounds = tree_model.getTightBounds()
+        # The height of the model is the difference in the Y-axis bounds, assuming the model is oriented along Y.
+        model_height = max_bounds.y - min_bounds.y
+
+        # Create a parent node for all the trees. This helps in keeping the scene graph organized.
+        scenery_node = self.render.attachNewNode("scenery")
+
+        # Loop to create and place each tree instance.
+        for _ in range(num_trees):
+            # An empty node is created as a placeholder for the tree instance.
+            tree_instance = scenery_node.attachNewNode("tree_instance")
+            # The tree model is instanced to the placeholder. This is efficient for rendering many copies.
+            tree_model.instanceTo(tree_instance)
+
+            # The desired height for this tree instance, normally distributed.
+            desired_height = random.gauss(5, 0.5)
+            # Calculate the scale factor required to achieve the desired height.
+            scale_factor = desired_height / model_height
+
+            # A random position is generated for the tree within the defined area.
+            x = random.uniform(-area_side / 2, area_side / 2)
+            y = random.uniform(-area_side / 2, area_side / 2)
+            # The tree is placed on the ground, accounting for the model's origin offset.
+            z = -min_bounds.y * scale_factor
+            tree_instance.setPos(x, y, z)
+
+            # Set the calculated scale to achieve the desired height.
+            tree_instance.setScale(scale_factor)
+            # Rotate the tree to be upright (90 degrees on pitch) and give it a random heading.
+            tree_instance.setHpr(random.uniform(0, 360), 90, 0)
+
     def setup_environment(self):
         """Sets up the skybox environment."""
         self.skybox = self.create_skybox()
@@ -91,8 +149,8 @@ class DroneSimulation(ShowBase):
     def create_skybox(self):
         """Creates a skybox with a green ground and sky textures."""
         skybox = NodePath("skybox")
-        sky_texture = self.loader.loadTexture("assets/textures/sky.png")
-        grass_texture = self.loader.loadTexture("assets/textures/grass.png")
+        sky_texture = self.loader.loadTexture("../assets/textures/sky.png")
+        grass_texture = self.loader.loadTexture("../assets/textures/grass.png")
         grass_texture.setWrapU(Texture.WM_repeat)
         grass_texture.setWrapV(Texture.WM_repeat)
 
@@ -138,7 +196,7 @@ class DroneSimulation(ShowBase):
         faces[5].setPos(0, 0, -1)
         faces[5].setHpr(0, 90, 0)
         faces[5].setTexture(grass_texture)
-        faces[5].setTexScale(TextureStage.getDefault(), 2, 2)
+        faces[5].setTexScale(TextureStage.getDefault(), 100, 100)
 
         # Set render properties for the skybox to ensure it's drawn correctly
         skybox.setShaderOff()
