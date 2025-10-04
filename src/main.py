@@ -3,11 +3,12 @@ from panda3d.core import loadPrcFileData, CardMaker, NodePath, TextNode, Texture
 from direct.gui.OnscreenText import OnscreenText
 from drone import Drone
 import random
+import os
 
 
 # Configure the window
 config = """
-win-size 1280 720
+win-size 1080 720
 window-title Drone Simulation
 load-file-type p3assimp
 model-cache-dir
@@ -33,6 +34,8 @@ class DroneSimulation(ShowBase):
 
         self.taskMgr.add(self.camera_move_task, "camera_move_task")
         self.taskMgr.add(self.drone_move_task, "drone_move_task")
+        self.taskMgr.add(self.update_camera2_pos_task, "update_camera2_pos_task")
+        self.taskMgr.add(self.update_buffer_cams_task, "update_buffer_cams_task")
 
         self.coords_text = OnscreenText(
             text="Pos: (0, 0, 0)", pos=(-1.7, 0.9), scale=0.05, align=TextNode.ALeft, mayChange=True
@@ -48,6 +51,42 @@ class DroneSimulation(ShowBase):
         self.accept("s-up", self.setKey, ["s", False])
         self.accept("a-up", self.setKey, ["a", False])
         self.accept("d-up", self.setKey, ["d", False])
+
+        # Ensure the video directory exists
+        if not os.path.exists("video"):
+            os.makedirs("video")
+
+        # Start recording for the first 10 seconds
+        self.taskMgr.doMethodLater(0, self.start_recording, "start_recording")
+        self.taskMgr.doMethodLater(10, self.stop_recording, "stop_recording")
+
+    def start_recording(self, task):
+        """Starts recording the simulation."""
+        # Record from the first buffer
+        self.movie(
+            namePrefix="video/cam1_frame",
+            duration=10.0,
+            fps=30,
+            format="png",
+            sd=4,
+            source=self.buffer1,
+        )
+        # Record from the second buffer
+        self.movie(
+            namePrefix="video/cam2_frame",
+            duration=10.0,
+            fps=30,
+            format="png",
+            sd=4,
+            source=self.buffer2,
+        )
+        print("Started recording from both cameras...")
+        return task.done
+
+    def stop_recording(self, task):
+        """Stops recording the simulation."""
+        print("...Finished recording from both cameras.")
+        return task.done
 
     def drone_move_task(self, task):
         """Moves the drone based on its internal logic."""
@@ -78,6 +117,29 @@ class DroneSimulation(ShowBase):
         if self.keyMap["d"]:
             self.camera.setH(self.camera.getH() - rot_speed * dt)
 
+        return task.cont
+
+    def update_camera2_pos_task(self, task):
+        """Keeps the second camera to the right of the first camera."""
+        # The quat represents the rotation of the camera.
+        # getRight() gives a vector pointing to the right of the camera.
+        right_vec = self.camera.getQuat(self.render).getRight()
+        # The new position is 1 meter to the right of the first camera.
+        self.camera2.setPos(self.camera.getPos() + right_vec * 1)
+        # Keep the orientation of the second camera the same as the first.
+        self.camera2.setHpr(self.camera.getHpr())
+        return task.cont
+
+    def update_buffer_cams_task(self, task):
+        """Updates the buffer cameras to match the main cameras."""
+        self.cam1_buffer.setPosHpr(
+            self.camera.getPos(),
+            self.camera.getHpr(),
+        )
+        self.cam2_buffer.setPosHpr(
+            self.camera2.getPos(),
+            self.camera2.getHpr(),
+        )
         return task.cont
 
     def update_coords_task(self, task):
@@ -214,10 +276,29 @@ class DroneSimulation(ShowBase):
 
     def setup_cameras(self):
         """Sets up the cameras and their display regions."""
+        # Disable the default camera and control
+        self.disableMouse()
+        self.cam.node().setActive(False)
+
+        # Create the first camera for window display
+        self.camera = self.makeCamera(self.win, displayRegion=(0, 0.5, 0, 1))
         self.camera.reparentTo(self.render)
-        # Set initial camera position at 2m height, behind the drone
-        self.camera.setPos(random.uniform(-20, 20), random.uniform(-80, -50), 2)
+        self.camera.setPos(0, 0, 2)
         self.camera.setHpr(0, 5, 0)
+
+        # Create the second camera for window display
+        self.camera2 = self.makeCamera(self.win, displayRegion=(0.5, 1, 0, 1))
+        self.camera2.reparentTo(self.render)
+
+        # Create offscreen buffers for recording
+        self.buffer1 = self.win.makeTextureBuffer("Buffer1", 1080, 720)
+        self.buffer2 = self.win.makeTextureBuffer("Buffer2", 1080, 720)
+
+        # Create cameras for the offscreen buffers
+        self.cam1_buffer = self.makeCamera(self.buffer1)
+        self.cam1_buffer.reparentTo(self.render)
+        self.cam2_buffer = self.makeCamera(self.buffer2)
+        self.cam2_buffer.reparentTo(self.render)
 
 
 app = DroneSimulation()

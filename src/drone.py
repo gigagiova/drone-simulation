@@ -23,7 +23,7 @@ class Drone:
         self.mesh.setColor(1, 0, 0, 1)
 
         # Set initial position 2m above the ground
-        self.node.setPos(0, 0, 10)
+        self.node.setPos(random.uniform(-20, 20), random.uniform(50, 80), 10)
 
         # The speed of the drone in meters per second.
         self.speed = 100000.0
