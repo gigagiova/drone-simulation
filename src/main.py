@@ -3,7 +3,6 @@ from panda3d.core import loadPrcFileData, CardMaker, NodePath, TextNode, Texture
 from direct.gui.OnscreenText import OnscreenText
 from drone import Drone
 import random
-import math
 
 
 # Configure the window
@@ -217,7 +216,7 @@ class DroneSimulation(ShowBase):
         """Sets up the cameras and their display regions."""
         self.camera.reparentTo(self.render)
         # Set initial camera position at 2m height, behind the drone
-        self.camera.setPos(-20, -80, 2)
+        self.camera.setPos(random.uniform(-20, 20), random.uniform(-80, -50), 2)
         self.camera.setHpr(0, 5, 0)
 
 
